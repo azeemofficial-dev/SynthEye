@@ -1,5 +1,6 @@
 # SynthEye
 Deepfake Videos and Pictures and Misinformation Detection System
+
 Roles:
 * Azeem – Project Lead + Model work + System Integration & Decision Logic
 * Bhumika – Deepfake Image Detection
