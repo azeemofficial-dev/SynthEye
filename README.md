@@ -6,4 +6,4 @@ Roles:
 * Bhumika – Project Lead, Deepfake Image Detection
 * Jiya – Deepfake Video Detection
 * Akshita – Fake News / Misinformation Detection (Text NLP)
-* Surya – Interface, Deployment & End-to-End Testing
+* Surya – User Interface, Deployment & End-to-End Testing
