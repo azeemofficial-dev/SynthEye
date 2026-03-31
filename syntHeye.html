@@ -1,0 +1,1624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SynthEye - See Through the Lie</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&family=Exo+2:ital,wght@0,200;0,400;1,200&display=swap" rel="stylesheet" />
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<style>
+  :root {
+    --bg: #020408;
+    --surface: #070d14;
+    --cyan: #00e5ff;
+    --cyan-dim: #005f6b;
+    --red: #ff2244;
+    --red-dim: #5a0014;
+    --gold: #ffd700;
+    --text: #c8dde8;
+    --muted: #3a5a6a;
+    --border: rgba(0,229,255,0.12);
+    --glow: 0 0 20px rgba(0,229,255,0.4), 0 0 60px rgba(0,229,255,0.1);
+    --glow-red: 0 0 20px rgba(255,34,68,0.5), 0 0 60px rgba(255,34,68,0.15);
+  }
+
+  *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    overflow-x: hidden;
+    cursor: none;
+  }
+
+  /* CUSTOM CURSOR */
+  #cursor {
+    position: fixed; width: 12px; height: 12px;
+    background: var(--cyan); border-radius: 50%;
+    pointer-events: none; z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: transform 0.1s, background 0.2s;
+    box-shadow: var(--glow);
+    mix-blend-mode: screen;
+  }
+  #cursor-ring {
+    position: fixed; width: 36px; height: 36px;
+    border: 1px solid rgba(0,229,255,0.5); border-radius: 50%;
+    pointer-events: none; z-index: 9998;
+    transform: translate(-50%, -50%);
+    transition: transform 0.18s ease, width 0.2s, height 0.2s;
+  }
+
+  /* THREE.JS CANVAS */
+  #bg-canvas {
+    position: fixed; inset: 0;
+    z-index: 0; pointer-events: none;
+  }
+
+  /* SCANLINE OVERLAY */
+  .scanlines {
+    position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px
+    );
+    animation: scanMove 8s linear infinite;
+  }
+  @keyframes scanMove {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100px; }
+  }
+
+  /* VIGNETTE */
+  .vignette {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.85) 100%);
+  }
+
+  /* NOISE */
+  .noise {
+    position: fixed; inset: -50%; z-index: 2; pointer-events: none;
+    width: 200%; height: 200%;
+    opacity: 0.025;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    animation: noiseAnim 0.5s steps(2) infinite;
+  }
+  @keyframes noiseAnim {
+    0%,100% { transform: translate(0,0); }
+    25%      { transform: translate(-1%,-1%); }
+    50%      { transform: translate(1%,0.5%); }
+    75%      { transform: translate(-0.5%,1%); }
+  }
+
+  /* NAV */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 60px;
+    background: linear-gradient(180deg, rgba(2,4,8,0.95) 0%, transparent 100%);
+    border-bottom: 1px solid var(--border);
+  }
+  .nav-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.4rem; font-weight: 900;
+    letter-spacing: 0.2em;
+    color: var(--cyan);
+    text-shadow: var(--glow);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .logo-eye {
+    width: 28px; height: 28px;
+    border: 2px solid var(--cyan);
+    border-radius: 50% 5px;
+    rotate: 45deg;
+    display: flex; align-items: center; justify-content: center;
+    animation: eyePulse 3s ease-in-out infinite;
+  }
+  .logo-eye::after {
+    content: '';
+    width: 10px; height: 10px;
+    background: var(--cyan);
+    border-radius: 50%;
+    animation: eyePulse 2s ease-in-out infinite reverse;
+  }
+  @keyframes eyePulse {
+    0%,100% { box-shadow: var(--glow); opacity: 1; }
+    50%      { box-shadow: none; opacity: 0.6; }
+  }
+  .nav-links {
+    display: flex; gap: 40px; list-style: none;
+  }
+  .nav-links a {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem; letter-spacing: 0.15em;
+    color: var(--muted); text-decoration: none;
+    text-transform: uppercase;
+    transition: color 0.3s, text-shadow 0.3s;
+  }
+  .nav-links a:hover { color: var(--cyan); text-shadow: var(--glow); }
+  .nav-cta {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.7rem; letter-spacing: 0.15em;
+    color: var(--bg); background: var(--cyan);
+    border: none; padding: 10px 24px;
+    cursor: none; text-transform: uppercase;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    transition: background 0.3s, box-shadow 0.3s;
+  }
+  .nav-cta:hover { background: #fff; box-shadow: var(--glow); }
+
+  /* CONTENT WRAPPER */
+  .content { position: relative; z-index: 10; }
+
+  /* HERO */
+  #hero {
+    min-height: 100vh;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    text-align: center; padding: 120px 40px 80px;
+    position: relative; overflow: hidden;
+  }
+
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    border: 1px solid var(--border);
+    padding: 6px 18px; margin-bottom: 40px;
+    font-size: 0.65rem; letter-spacing: 0.2em;
+    color: var(--cyan); text-transform: uppercase;
+    background: rgba(0,229,255,0.04);
+    animation: fadeUp 0.8s ease both;
+  }
+  .badge-dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--red);
+    animation: blinkRed 1.5s ease-in-out infinite;
+  }
+  @keyframes blinkRed { 0%,100%{opacity:1;} 50%{opacity:0.2;} }
+
+  .hero-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(3.5rem, 10vw, 9rem);
+    font-weight: 900;
+    line-height: 0.9;
+    letter-spacing: -0.02em;
+    color: #fff;
+    margin-bottom: 12px;
+    animation: fadeUp 0.8s 0.1s ease both;
+    position: relative;
+  }
+  .title-synth { color: var(--cyan); text-shadow: var(--glow); }
+  .title-eye  { color: #fff; }
+
+  .glitch {
+    position: relative; display: inline-block;
+    animation: glitchIdle 6s ease-in-out infinite;
+  }
+  .glitch::before, .glitch::after {
+    content: attr(data-text);
+    position: absolute; inset: 0;
+    font-family: inherit; font-size: inherit; font-weight: inherit;
+  }
+  .glitch::before {
+    color: var(--red); clip-path: polygon(0 0,100% 0,100% 40%,0 40%);
+    animation: glitchA 6s ease-in-out infinite;
+  }
+  .glitch::after {
+    color: var(--cyan); clip-path: polygon(0 60%,100% 60%,100% 100%,0 100%);
+    animation: glitchB 6s ease-in-out infinite;
+  }
+  @keyframes glitchIdle { 0%,90%,100%{transform:none;} 92%{transform:skewX(-2deg);} 94%{transform:skewX(1deg);} 96%{transform:none;} }
+  @keyframes glitchA { 0%,90%,100%{transform:none;opacity:0;} 92%{transform:translate(-3px,1px);opacity:0.8;} 94%{transform:translate(2px,-1px);} 96%{transform:none;opacity:0;} }
+  @keyframes glitchB { 0%,90%,100%{transform:none;opacity:0;} 92%{transform:translate(3px,-1px);opacity:0.8;} 94%{transform:translate(-2px,1px);} 96%{transform:none;opacity:0;} }
+
+  .hero-sub {
+    font-family: 'Exo 2', sans-serif;
+    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+    font-weight: 200; font-style: italic;
+    color: var(--muted); letter-spacing: 0.08em;
+    margin-bottom: 60px;
+    animation: fadeUp 0.8s 0.2s ease both;
+  }
+  .hero-sub em { color: var(--cyan); font-style: normal; }
+
+  .hero-actions {
+    display: flex; gap: 20px; flex-wrap: wrap; justify-content: center;
+    animation: fadeUp 0.8s 0.3s ease both;
+  }
+  .btn-primary {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--bg); background: var(--cyan);
+    border: none; padding: 16px 40px; cursor: none;
+    clip-path: polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);
+    transition: all 0.3s;
+    position: relative; overflow: hidden;
+  }
+  .btn-primary::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+    transform: translateX(-100%); transition: transform 0.5s;
+  }
+  .btn-primary:hover::after { transform: translateX(100%); }
+  .btn-primary:hover { box-shadow: var(--glow); }
+
+  .btn-ghost {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: var(--cyan); background: transparent;
+    border: 1px solid rgba(0,229,255,0.3);
+    padding: 16px 40px; cursor: none;
+    clip-path: polygon(12px 0%,100% 0%,calc(100% - 12px) 100%,0% 100%);
+    transition: all 0.3s;
+  }
+  .btn-ghost:hover {
+    border-color: var(--cyan);
+    background: rgba(0,229,255,0.06);
+    box-shadow: var(--glow);
+  }
+
+  /* EYE ILLUSTRATION */
+  .hero-eye-wrap {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: min(600px, 90vw); height: min(600px, 90vw);
+    pointer-events: none; z-index: -1;
+    opacity: 0.12;
+  }
+  .eye-svg { width: 100%; height: 100%; }
+
+  /* SCROLL INDICATOR */
+  .scroll-hint {
+    position: absolute; bottom: 40px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    font-size: 0.6rem; letter-spacing: 0.2em; color: var(--muted);
+    text-transform: uppercase; animation: fadeUp 1s 0.6s ease both;
+  }
+  .scroll-line {
+    width: 1px; height: 50px;
+    background: linear-gradient(180deg, var(--cyan), transparent);
+    animation: scrollDrop 2s ease-in-out infinite;
+  }
+  @keyframes scrollDrop { 0%{transform:scaleY(0);transform-origin:top;} 50%{transform:scaleY(1);transform-origin:top;} 51%{transform-origin:bottom;} 100%{transform:scaleY(0);transform-origin:bottom;} }
+
+  @keyframes fadeUp { from{opacity:0;transform:translateY(30px);} to{opacity:1;transform:none;} }
+
+  /* STATS BAR */
+  .stats-bar {
+    padding: 30px 60px;
+    border-top: 1px solid var(--border);
+    border-bottom: 1px solid var(--border);
+    display: flex; gap: 0;
+    background: rgba(0,229,255,0.02);
+    overflow: hidden;
+  }
+  .stat {
+    flex: 1; text-align: center; padding: 20px;
+    border-right: 1px solid var(--border);
+    position: relative;
+  }
+  .stat:last-child { border-right: none; }
+  .stat-num {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.5rem; font-weight: 900;
+    color: var(--cyan); text-shadow: var(--glow);
+    line-height: 1;
+  }
+  .stat-label { font-size: 0.65rem; letter-spacing: 0.15em; color: var(--muted); margin-top: 6px; text-transform: uppercase; }
+
+  /* SECTION COMMON */
+  section { padding: 120px 60px; }
+  .section-tag {
+    font-size: 0.6rem; letter-spacing: 0.3em; text-transform: uppercase;
+    color: var(--cyan); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .section-tag::before {
+    content: ''; display: block;
+    width: 30px; height: 1px; background: var(--cyan);
+  }
+  .section-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(2rem, 4vw, 3.5rem);
+    font-weight: 700; color: #fff; line-height: 1.1;
+    margin-bottom: 20px;
+  }
+  .section-body { font-size: 0.9rem; line-height: 1.8; color: var(--muted); max-width: 560px; }
+
+  /* FEATURES */
+  #features { background: var(--surface); }
+  .features-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 2px; margin-top: 80px;
+  }
+  .feature-card {
+    background: var(--bg);
+    padding: 48px 40px;
+    border: 1px solid var(--border);
+    position: relative; overflow: hidden;
+    transition: border-color 0.4s, transform 0.4s;
+    cursor: none;
+  }
+  .feature-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    transform: scaleX(0); transition: transform 0.5s;
+  }
+  .feature-card:hover::before { transform: scaleX(1); }
+  .feature-card:hover { border-color: rgba(0,229,255,0.3); transform: translateY(-4px); }
+  .feature-card.red-accent::before { background: linear-gradient(90deg, transparent, var(--red), transparent); }
+  .feature-card.red-accent:hover { border-color: rgba(255,34,68,0.3); }
+
+  .feature-icon {
+    width: 60px; height: 60px;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 28px; position: relative;
+    font-size: 1.6rem;
+    clip-path: polygon(8px 0%, 100% 0%, calc(100% - 8px) 100%, 0% 100%);
+    background: rgba(0,229,255,0.05);
+  }
+  .feature-card.red-accent .feature-icon { background: rgba(255,34,68,0.05); }
+
+  .feature-num {
+    position: absolute; top: 16px; right: 20px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 4rem; font-weight: 900;
+    color: rgba(255,255,255,0.03);
+    line-height: 1;
+  }
+  .feature-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.1rem; font-weight: 700;
+    color: #fff; margin-bottom: 14px; letter-spacing: 0.05em;
+  }
+  .feature-desc { font-size: 0.82rem; line-height: 1.8; color: var(--muted); }
+  .feature-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 24px; }
+  .tag {
+    font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+    padding: 4px 12px; border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .tag.active { border-color: rgba(0,229,255,0.4); color: var(--cyan); }
+  .tag.red { border-color: rgba(255,34,68,0.4); color: var(--red); }
+
+  /* HOW IT WORKS */
+  #how { position: relative; }
+  .pipeline {
+    display: flex; align-items: flex-start; gap: 0;
+    margin-top: 80px; position: relative;
+  }
+  .pipeline::before {
+    content: ''; position: absolute;
+    top: 36px; left: 36px; right: 36px; height: 1px;
+    background: linear-gradient(90deg, var(--cyan-dim), var(--cyan), var(--red-dim));
+    z-index: 0;
+  }
+  .pipe-step {
+    flex: 1; display: flex; flex-direction: column;
+    align-items: center; text-align: center;
+    padding: 0 20px; position: relative; z-index: 1;
+  }
+  .pipe-num {
+    width: 72px; height: 72px;
+    border: 1px solid var(--cyan);
+    background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.2rem; font-weight: 900; color: var(--cyan);
+    margin-bottom: 24px;
+    clip-path: polygon(20% 0%,80% 0%,100% 50%,80% 100%,20% 100%,0% 50%);
+    animation: hexPulse 4s ease-in-out infinite;
+  }
+  .pipe-step:nth-child(3) .pipe-num { border-color: var(--red); color: var(--red); animation: hexPulseRed 4s 1s ease-in-out infinite; }
+  .pipe-step:nth-child(5) .pipe-num { border-color: var(--gold); color: var(--gold); animation: hexPulseGold 4s 2s ease-in-out infinite; }
+  @keyframes hexPulse    { 0%,100%{box-shadow:0 0 0 rgba(0,229,255,0);}    50%{box-shadow:0 0 30px rgba(0,229,255,0.3);} }
+  @keyframes hexPulseRed  { 0%,100%{box-shadow:0 0 0 rgba(255,34,68,0);}   50%{box-shadow:0 0 30px rgba(255,34,68,0.3);} }
+  @keyframes hexPulseGold { 0%,100%{box-shadow:0 0 0 rgba(255,215,0,0);}   50%{box-shadow:0 0 30px rgba(255,215,0,0.3);} }
+  .pipe-label {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.75rem; font-weight: 700; color: #fff;
+    margin-bottom: 10px; letter-spacing: 0.08em;
+  }
+  .pipe-text { font-size: 0.72rem; color: var(--muted); line-height: 1.6; }
+  .pipe-arrow {
+    width: 40px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--cyan-dim); font-size: 1.2rem;
+    position: relative; z-index: 1;
+    flex-shrink: 0;
+  }
+
+  /* DETECTION INTERFACE */
+  #interface { background: var(--surface); }
+  .interface-wrap {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 60px; margin-top: 80px; align-items: center;
+  }
+  .terminal {
+    background: #000; border: 1px solid var(--border);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    position: relative;
+  }
+  .terminal-bar {
+    background: rgba(0,229,255,0.07); border-bottom: 1px solid var(--border);
+    padding: 12px 20px; display: flex; align-items: center; gap: 10px;
+  }
+  .term-dot { width: 10px; height: 10px; border-radius: 50%; }
+  .term-dot.r { background: var(--red); }
+  .term-dot.y { background: #ffd700; }
+  .term-dot.g { background: #00ff88; }
+  .term-title { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.15em; margin-left: auto; text-transform: uppercase; }
+  .terminal-body { padding: 24px; min-height: 340px; }
+  .term-line { font-size: 0.75rem; line-height: 2; color: var(--muted); }
+  .term-line .prompt { color: var(--cyan); }
+  .term-line .path { color: #007fff; }
+  .term-line .cmd { color: #fff; }
+  .term-line .ok { color: #00ff88; }
+  .term-line .warn { color: #ffd700; }
+  .term-line .danger { color: var(--red); }
+  .term-line .comment { color: #3a5a6a; }
+  .blink-cursor { animation: blink 1s step-end infinite; }
+  @keyframes blink { 0%,100%{opacity:1;} 50%{opacity:0;} }
+
+  .scan-bar {
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    position: absolute; left: 0; right: 0;
+    animation: scanLine 3s ease-in-out infinite;
+  }
+  @keyframes scanLine { 0%{top:0;opacity:1;} 100%{top:100%;opacity:0.3;} }
+
+  .panel-info { display: flex; flex-direction: column; gap: 28px; }
+  .info-block {
+    border-left: 2px solid var(--cyan);
+    padding-left: 24px;
+  }
+  .info-block.red { border-color: var(--red); }
+  .info-block-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem; font-weight: 700; color: #fff;
+    margin-bottom: 8px;
+  }
+  .info-block-text { font-size: 0.78rem; color: var(--muted); line-height: 1.7; }
+
+  .meter-wrap { margin-top: 12px; }
+  .meter-label { font-size: 0.65rem; color: var(--muted); margin-bottom: 4px; display: flex; justify-content: space-between; }
+  .meter {
+    height: 3px; background: rgba(255,255,255,0.05);
+    border-radius: 2px; overflow: hidden;
+  }
+  .meter-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+    transition: width 1.5s ease;
+  }
+  .meter-fill.red { background: linear-gradient(90deg, var(--red-dim), var(--red)); }
+
+  /* UPLOAD ZONE */
+  .upload-zone {
+    border: 1px dashed rgba(0,229,255,0.2);
+    padding: 40px; text-align: center;
+    background: rgba(0,229,255,0.02);
+    transition: all 0.3s; cursor: none;
+    position: relative; overflow: hidden;
+    margin-top: 30px;
+  }
+  .upload-zone:hover { border-color: rgba(0,229,255,0.5); background: rgba(0,229,255,0.04); }
+  .upload-icon { font-size: 2.5rem; margin-bottom: 12px; opacity: 0.5; }
+  .upload-text { font-size: 0.75rem; color: var(--muted); }
+  .upload-text span { color: var(--cyan); }
+  .upload-formats { font-size: 0.6rem; color: #2a4050; margin-top: 8px; letter-spacing: 0.1em; }
+  .upload-actions {
+    margin-top: 16px;
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .upload-btn {
+    border: 1px solid rgba(0,229,255,0.35);
+    background: rgba(0,229,255,0.08);
+    color: var(--cyan);
+    padding: 9px 14px;
+    font-size: 0.65rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-family: 'Orbitron', sans-serif;
+    cursor: none;
+  }
+  .upload-btn.primary {
+    border-color: rgba(255,34,68,0.45);
+    background: rgba(255,34,68,0.14);
+    color: #ff8a9a;
+  }
+  .upload-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .upload-textarea {
+    width: 100%;
+    min-height: 90px;
+    margin-top: 14px;
+    background: rgba(0,0,0,0.45);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.75rem;
+    padding: 10px 12px;
+    resize: vertical;
+  }
+  .upload-status {
+    margin-top: 12px;
+    font-size: 0.68rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+  .upload-result {
+    margin-top: 10px;
+    text-align: left;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(0,229,255,0.2);
+    padding: 10px 12px;
+    font-size: 0.68rem;
+    color: #b7d2df;
+    max-height: 220px;
+    overflow: auto;
+  }
+
+  /* ABOUT */
+  #about {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 100px; align-items: center;
+  }
+  .about-visual {
+    position: relative; height: 400px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .about-rings {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .ring {
+    position: absolute; border: 1px solid;
+    border-radius: 50%;
+    animation: spin linear infinite;
+  }
+  .ring:nth-child(1) { width: 300px; height: 300px; border-color: rgba(0,229,255,0.15); animation-duration: 20s; }
+  .ring:nth-child(2) { width: 220px; height: 220px; border-color: rgba(0,229,255,0.2); animation-duration: 14s; animation-direction: reverse; }
+  .ring:nth-child(3) { width: 140px; height: 140px; border-color: rgba(255,34,68,0.2); animation-duration: 9s; }
+  @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+  .about-center {
+    width: 70px; height: 70px;
+    background: radial-gradient(circle, var(--cyan) 0%, transparent 70%);
+    border-radius: 50%; opacity: 0.6;
+    animation: coreGlow 3s ease-in-out infinite;
+  }
+  @keyframes coreGlow { 0%,100%{transform:scale(1);opacity:0.6;} 50%{transform:scale(1.3);opacity:0.9;} }
+
+  .about-text .section-body { max-width: none; }
+  .about-list { margin-top: 30px; list-style: none; display: flex; flex-direction: column; gap: 14px; }
+  .about-list li {
+    display: flex; align-items: flex-start; gap: 16px;
+    font-size: 0.82rem; color: var(--muted); line-height: 1.5;
+  }
+  .about-list li::before {
+    content: 'â—ˆ'; color: var(--cyan); flex-shrink: 0; margin-top: 1px;
+  }
+
+  /* FOOTER */
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 60px;
+    display: flex; justify-content: space-between; align-items: center;
+    background: var(--surface);
+    flex-wrap: wrap; gap: 30px;
+  }
+  .footer-logo {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1rem; font-weight: 900; color: var(--cyan);
+    letter-spacing: 0.2em;
+  }
+  .footer-copy { font-size: 0.65rem; color: var(--muted); letter-spacing: 0.1em; }
+  .footer-links { display: flex; gap: 30px; }
+  .footer-links a { font-size: 0.65rem; color: var(--muted); text-decoration: none; letter-spacing: 0.1em; transition: color 0.2s; }
+  .footer-links a:hover { color: var(--cyan); }
+
+  /* ALERT RIBBON */
+  .alert-ribbon {
+    background: rgba(255,34,68,0.06); border-top: 1px solid rgba(255,34,68,0.2); border-bottom: 1px solid rgba(255,34,68,0.2);
+    padding: 14px 60px; overflow: hidden;
+  }
+  .ribbon-inner {
+    display: flex; gap: 80px; white-space: nowrap;
+    animation: ribbonScroll 20s linear infinite;
+  }
+  .ribbon-item {
+    font-size: 0.65rem; letter-spacing: 0.15em; text-transform: uppercase;
+    color: rgba(255,34,68,0.7); display: flex; align-items: center; gap: 12px; flex-shrink: 0;
+  }
+  .ribbon-item::before { content: 'â—†'; font-size: 0.4rem; }
+  @keyframes ribbonScroll { 0%{transform:translateX(0);} 100%{transform:translateX(-50%);} }
+
+  /* RESPONSIVE */
+  @media (max-width: 900px) {
+    nav { padding: 16px 24px; }
+    .nav-links { display: none; }
+    section { padding: 80px 24px; }
+    .stats-bar { padding: 20px 24px; flex-wrap: wrap; }
+    .stat { flex: 0 0 50%; }
+    .pipeline { flex-direction: column; align-items: center; }
+    .pipeline::before { display: none; }
+    .pipe-arrow { transform: rotate(90deg); height: 40px; }
+    .interface-wrap, #about { grid-template-columns: 1fr; }
+    footer { flex-direction: column; text-align: center; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Cursor -->
+<div id="cursor"></div>
+<div id="cursor-ring"></div>
+
+<!-- Background -->
+<canvas id="bg-canvas"></canvas>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+<div class="noise"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">
+    <div class="logo-eye"></div>
+    SYNTH<span style="color:#fff">EYE</span>
+  </div>
+  <ul class="nav-links">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#how">How It Works</a></li>
+    <li><a href="#interface">Interface</a></li>
+    <li><a href="#about">About</a></li>
+    <li><a id="navLoginLink" href="/login">Login</a></li>
+    <li><a id="navSignupLink" href="/signup">Sign Up</a></li>
+  </ul>
+  <button id="authCta" class="nav-cta" type="button">Access System</button>
+</nav>
+
+<!-- CONTENT -->
+<div class="content">
+
+  <!-- HERO -->
+  <section id="hero">
+    <!-- BG Eye -->
+    <div class="hero-eye-wrap">
+      <svg class="eye-svg" viewBox="0 0 600 600" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <radialGradient id="eyeGlow" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stop-color="#00e5ff" stop-opacity="0.6"/>
+            <stop offset="100%" stop-color="#00e5ff" stop-opacity="0"/>
+          </radialGradient>
+        </defs>
+        <ellipse cx="300" cy="300" rx="280" ry="120" fill="none" stroke="#00e5ff" stroke-width="1.5" opacity="0.6">
+          <animateTransform attributeName="transform" type="rotate" from="0 300 300" to="360 300 300" dur="30s" repeatCount="indefinite"/>
+        </ellipse>
+        <circle cx="300" cy="300" r="100" fill="none" stroke="#00e5ff" stroke-width="1" opacity="0.4"/>
+        <circle cx="300" cy="300" r="60" fill="url(#eyeGlow)" opacity="0.8">
+          <animate attributeName="r" values="60;70;60" dur="3s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="300" cy="300" r="30" fill="#00e5ff" opacity="0.3"/>
+        <!-- Iris lines -->
+        <g stroke="#00e5ff" stroke-width="0.5" opacity="0.3">
+          <line x1="300" y1="200" x2="300" y2="400"/>
+          <line x1="200" y1="300" x2="400" y2="300"/>
+          <line x1="229" y1="229" x2="371" y2="371"/>
+          <line x1="371" y1="229" x2="229" y2="371"/>
+        </g>
+        <!-- Outer rings -->
+        <circle cx="300" cy="300" r="200" fill="none" stroke="#00e5ff" stroke-width="0.5" opacity="0.2" stroke-dasharray="4 8"/>
+        <circle cx="300" cy="300" r="260" fill="none" stroke="#00e5ff" stroke-width="0.5" opacity="0.15" stroke-dasharray="2 12"/>
+      </svg>
+    </div>
+
+    <div class="hero-badge">
+      <div class="badge-dot"></div>
+      AI-Powered Synthetic Media Detection
+    </div>
+
+    <h1 class="hero-title">
+      <span class="title-synth glitch" data-text="SYNTH">SYNTH</span><span class="title-eye">EYE</span>
+    </h1>
+    <p class="hero-sub">
+      The <em>intelligence layer</em> between synthetic deception and reality.<br/>
+      Deepfakes. Misinformation. We see through both.
+    </p>
+    <div class="hero-actions">
+      <button class="btn-primary">Analyse Media</button>
+      <button class="btn-ghost">View Architecture</button>
+    </div>
+
+    <div class="scroll-hint">
+      <span>Scroll</span>
+      <div class="scroll-line"></div>
+    </div>
+  </section>
+
+  <!-- STATS BAR -->
+  <div class="stats-bar">
+    <div class="stat">
+      <div id="statDeepfakeAcc" class="stat-num" data-target="0">0</div>
+      <div class="stat-label">Deepfake Val Accuracy %</div>
+    </div>
+    <div class="stat">
+      <div id="statMisinfoAcc" class="stat-num" data-target="0">0</div>
+      <div class="stat-label">Misinfo Val Accuracy %</div>
+    </div>
+    <div class="stat">
+      <div id="statSamples" class="stat-num" data-target="0">0</div>
+      <div class="stat-label">Training Samples</div>
+    </div>
+    <div class="stat">
+      <div id="statRuns" class="stat-num" data-target="0">0</div>
+      <div class="stat-label">Session Analyses</div>
+    </div>
+  </div>
+
+  <!-- ALERT RIBBON -->
+  <div class="alert-ribbon">
+    <div class="ribbon-inner">
+      <span class="ribbon-item">Deepfake Image Detection Active</span>
+      <span class="ribbon-item">Video Temporal Analysis Enabled</span>
+      <span class="ribbon-item">Fake News NLP Engine Running</span>
+      <span class="ribbon-item">Misinformation Graph Monitoring</span>
+      <span class="ribbon-item">System Status: Operational</span>
+      <span class="ribbon-item">Deepfake Image Detection Active</span>
+      <span class="ribbon-item">Video Temporal Analysis Enabled</span>
+      <span class="ribbon-item">Fake News NLP Engine Running</span>
+      <span class="ribbon-item">Misinformation Graph Monitoring</span>
+      <span class="ribbon-item">System Status: Operational</span>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="section-tag">Core Capabilities</div>
+    <h2 class="section-title">Four Eyes.<br/>One Truth.</h2>
+    <p class="section-body">SynthEye deploys a multi-modal AI pipeline to uncover manipulation across visual media and textual content, simultaneously in real time.</p>
+
+    <div class="features-grid">
+      <!-- Card 1 -->
+      <div class="feature-card">
+        <div class="feature-num">01</div>
+        <div class="feature-icon">IMG</div>
+        <div class="feature-title">Deepfake Image Detection</div>
+        <div class="feature-desc">Detects AI-generated or face-swapped images using frequency-domain analysis, GAN artifact fingerprinting, and biological consistency checks, even on high-quality fakes.</div>
+        <div class="feature-tags">
+          <span class="tag active">GAN Fingerprint</span>
+          <span class="tag active">Face Mesh</span>
+          <span class="tag">Frequency FFT</span>
+          <span class="tag">Blink Pattern</span>
+        </div>
+      </div>
+      <!-- Card 2 -->
+      <div class="feature-card red-accent">
+        <div class="feature-num">02</div>
+        <div class="feature-icon">VID</div>
+        <div class="feature-title">Deepfake Video Analysis</div>
+        <div class="feature-desc">Analyses temporal coherence between frames, lip-sync mismatches, unnatural blinking, and micro-expression inconsistencies across video timelines frame by frame.</div>
+        <div class="feature-tags">
+          <span class="tag red">Temporal Flow</span>
+          <span class="tag red">Lip Sync</span>
+          <span class="tag">Frame Diff</span>
+          <span class="tag">rPPG Signal</span>
+        </div>
+      </div>
+      <!-- Card 3 -->
+      <div class="feature-card">
+        <div class="feature-num">03</div>
+        <div class="feature-icon">TXT</div>
+        <div class="feature-title">Fake News Prediction</div>
+        <div class="feature-desc">Uses transformer-based NLP to classify articles, headlines, and social posts by analysing linguistic patterns, emotional manipulation, and source credibility signals.</div>
+        <div class="feature-tags">
+          <span class="tag active">Transformer NLP</span>
+          <span class="tag active">Sentiment</span>
+          <span class="tag">Claim Verify</span>
+          <span class="tag">Source Graph</span>
+        </div>
+      </div>
+      <!-- Card 4 -->
+      <div class="feature-card red-accent">
+        <div class="feature-num">04</div>
+        <div class="feature-icon">NET</div>
+        <div class="feature-title">Misinformation Spread Mapping</div>
+        <div class="feature-desc">Traces information propagation across networks, identifies coordinated inauthentic behaviour, and flags narratives matching known misinformation templates.</div>
+        <div class="feature-tags">
+          <span class="tag red">Graph Neural Net</span>
+          <span class="tag red">Bot Detection</span>
+          <span class="tag">Narrative Track</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how">
+    <div class="section-tag">Pipeline</div>
+    <h2 class="section-title">From Upload<br/>to Verdict.</h2>
+    <p class="section-body">Every piece of media passes through a multi-stage verification pipeline designed for speed, depth, and explainability.</p>
+
+    <div class="pipeline">
+      <div class="pipe-step">
+        <div class="pipe-num">01</div>
+        <div class="pipe-label">Ingest</div>
+        <div class="pipe-text">Upload image, video, or article. The system auto-detects content type and routes to the correct module.</div>
+      </div>
+      <div class="pipe-arrow">-></div>
+      <div class="pipe-step">
+        <div class="pipe-num">02</div>
+        <div class="pipe-label">Preprocess</div>
+        <div class="pipe-text">Frame extraction, noise normalisation, metadata stripping, and tokenisation for text inputs.</div>
+      </div>
+      <div class="pipe-arrow">-></div>
+      <div class="pipe-step">
+        <div class="pipe-num">03</div>
+        <div class="pipe-label">Analyse</div>
+        <div class="pipe-text">AI models run in parallel: vision and language components cross-examine the evidence simultaneously.</div>
+      </div>
+      <div class="pipe-arrow">-></div>
+      <div class="pipe-step">
+        <div class="pipe-num">04</div>
+        <div class="pipe-label">Score</div>
+        <div class="pipe-text">Ensemble scoring with confidence intervals, explainability heatmaps, and anomaly localisation.</div>
+      </div>
+      <div class="pipe-arrow">-></div>
+      <div class="pipe-step">
+        <div class="pipe-num">05</div>
+        <div class="pipe-label">Verdict</div>
+        <div class="pipe-text">Clear authenticity score, risk level, flagged regions, and a human-readable explanation report.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DETECTION INTERFACE -->
+  <section id="interface">
+    <div class="section-tag">System Interface</div>
+    <h2 class="section-title">The Detection<br/>Console.</h2>
+
+    <div class="interface-wrap">
+      <div>
+        <div class="terminal">
+          <div class="scan-bar"></div>
+          <div class="terminal-bar">
+            <div class="term-dot r"></div>
+            <div class="term-dot y"></div>
+            <div class="term-dot g"></div>
+            <span class="term-title">SynthEye Terminal v1.0</span>
+          </div>
+          <div class="terminal-body">
+            <div class="term-line"><span class="comment"># SynthEye Analysis Engine</span></div>
+            <div class="term-line"><span class="prompt">syntHeye@core</span><span class="path"> ~/detection </span><span class="cmd">$ load media â€”file="suspect_video.mp4"</span></div>
+            <div class="term-line"><span class="ok">âœ” File loaded</span> [47.2 MB Â· H264 Â· 1080p Â· 30fps]</div>
+            <br/>
+            <div class="term-line"><span class="prompt">syntHeye@core</span><span class="path"> ~/detection </span><span class="cmd">$ run deepfake-scan â€”temporal â€”face-mesh</span></div>
+            <div class="term-line"><span class="comment">  Extracting 1,340 framesâ€¦</span></div>
+            <div class="term-line"><span class="comment">  Running face landmark detectionâ€¦</span></div>
+            <div class="term-line"><span class="comment">  Analysing temporal coherenceâ€¦</span></div>
+            <div class="term-line"><span class="comment">  Checking blink / micro-expressionâ€¦</span></div>
+            <div class="term-line"><span class="warn">âš  Anomaly detected at frames 412â€“438</span></div>
+            <div class="term-line"><span class="danger">âœ– DEEPFAKE PROBABILITY: 91.3%</span></div>
+            <br/>
+            <div class="term-line"><span class="prompt">syntHeye@core</span><span class="path"> ~/detection </span><span class="cmd">$ export â€”report="pdf" â€”heatmap<span class="blink-cursor">_</span></span></div>
+          </div>
+        </div>
+
+        <div class="upload-zone" style="margin-top:20px;">
+          <input id="mediaInput" type="file" accept=".jpg,.jpeg,.png,.mp4,.mov,.webm,.txt" hidden />
+          <div class="upload-icon">Upload</div>
+          <div class="upload-text">Drop media here or <span>browse files</span></div>
+          <div class="upload-formats">JPG · PNG · MP4 · MOV · WEBM · TXT</div>
+          <div class="upload-actions">
+            <button id="browseBtn" class="upload-btn" type="button">Browse File</button>
+            <button id="analyzeFileBtn" class="upload-btn primary" type="button">Analyze File</button>
+          </div>
+          <textarea
+            id="newsTextInput"
+            class="upload-textarea"
+            placeholder="Or paste article/headline text for misinformation analysis..."
+          ></textarea>
+          <div class="upload-actions">
+            <button id="analyzeTextBtn" class="upload-btn primary" type="button">Analyze Text</button>
+          </div>
+          <div id="analysisStatus" class="upload-status">No analysis yet.</div>
+          <pre id="analysisResult" class="upload-result">Result output will appear here.</pre>
+        </div>
+      </div>
+
+      <div class="panel-info">
+        <div class="info-block">
+          <div class="info-block-title">Visual Deepfake Module</div>
+          <div class="info-block-text">Image detector based on MobileNetV2 transfer learning. Uses canonical fake/real labels and outputs confidence from model probabilities.</div>
+          <div class="meter-wrap">
+            <div class="meter-label"><span id="meterVisualName">Validation Accuracy</span><span id="meterVisualValue">--</span></div>
+            <div class="meter"><div id="meterVisualFill" class="meter-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="info-block red">
+          <div class="info-block-title">Video Temporal Module</div>
+          <div class="info-block-text">Video score is computed from sampled frames and aggregated with trimmed-mean logic for stable fake/real confidence.</div>
+          <div class="meter-wrap">
+            <div class="meter-label"><span id="meterVideoName">Validation AUC</span><span id="meterVideoValue">--</span></div>
+            <div class="meter"><div id="meterVideoFill" class="meter-fill red" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="info-block">
+          <div class="info-block-title">Fake News NLP Module</div>
+          <div class="info-block-text">Text detector uses TF-IDF (1,2)-gram features with logistic regression for binary fake/real inference.</div>
+          <div class="meter-wrap">
+            <div class="meter-label"><span id="meterMisinfoAccName">Validation Accuracy</span><span id="meterMisinfoAccValue">--</span></div>
+            <div class="meter"><div id="meterMisinfoAccFill" class="meter-fill" style="width:0%"></div></div>
+          </div>
+        </div>
+        <div class="info-block red">
+          <div class="info-block-title">Misinformation Reliability Module</div>
+          <div class="info-block-text">Tracks fake-class F1 and live fake probability for text submissions to keep confidence interpretation grounded.</div>
+          <div class="meter-wrap">
+            <div class="meter-label"><span id="meterMisinfoF1Name">Validation F1 (fake)</span><span id="meterMisinfoF1Value">--</span></div>
+            <div class="meter"><div id="meterMisinfoF1Fill" class="meter-fill red" style="width:0%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section id="about">
+    <div class="about-visual">
+      <div class="about-rings">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+      <div class="about-center"></div>
+    </div>
+    <div class="about-text">
+      <div class="section-tag">About the System</div>
+      <h2 class="section-title">Built to Expose<br/>Synthetic Reality.</h2>
+      <p class="section-body">In an era where synthetic media erodes public trust, SynthEye is a modular AI system for journalists, researchers, platforms, and security analysts who need to know: <em style="color:var(--cyan)">is this real?</em></p>
+      <ul class="about-list">
+        <li>Multi-modal detection for images, video, and text in one unified pipeline.</li>
+        <li>Explainable outputs where each verdict includes evidence, not only a score.</li>
+        <li>Robust baselines designed for practical CPU-first deployment.</li>
+        <li>Modular architecture so detection modules can be swapped as models evolve.</li>
+        <li>Privacy-first processing with no long-term media storage by default.</li>
+      </ul>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-logo">SYNTH<span style="color:#fff">EYE</span></div>
+    <div class="footer-copy">Copyright 2026 SynthEye. All rights reserved. See Through the Lie.</div>
+    <div class="footer-links">
+      <a href="#">Docs</a>
+      <a href="#">API</a>
+      <a href="#">Privacy</a>
+      <a href="#">Contact</a>
+    </div>
+  </footer>
+
+</div><!-- .content -->
+
+<script>
+/* â”€â”€â”€ CUSTOM CURSOR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+const cursor = document.getElementById('cursor');
+const ring   = document.getElementById('cursor-ring');
+let mx=0,my=0,rx=0,ry=0;
+window.addEventListener('mousemove', e => { mx=e.clientX; my=e.clientY; });
+(function animCursor(){
+  rx += (mx-rx)*0.12; ry += (my-ry)*0.12;
+  cursor.style.left = mx+'px'; cursor.style.top = my+'px';
+  ring.style.left = rx+'px'; ring.style.top = ry+'px';
+  requestAnimationFrame(animCursor);
+})();
+document.querySelectorAll('button,a,.feature-card,.upload-zone').forEach(el=>{
+  el.addEventListener('mouseenter',()=>{ ring.style.width='60px'; ring.style.height='60px'; cursor.style.background='var(--red)'; });
+  el.addEventListener('mouseleave',()=>{ ring.style.width='36px'; ring.style.height='36px'; cursor.style.background='var(--cyan)'; });
+});
+
+/* â”€â”€â”€ THREE.JS BACKGROUND â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+(function initThree(){
+  const canvas = document.getElementById('bg-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, alpha:true, antialias:true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene  = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, innerWidth/innerHeight, 0.1, 1000);
+  camera.position.z = 28;
+
+  // Particle field
+  const count = 2200;
+  const positions = new Float32Array(count*3);
+  const colors    = new Float32Array(count*3);
+  for(let i=0;i<count;i++){
+    positions[i*3]   = (Math.random()-0.5)*80;
+    positions[i*3+1] = (Math.random()-0.5)*80;
+    positions[i*3+2] = (Math.random()-0.5)*80;
+    const r = Math.random();
+    if(r<0.7){ colors[i*3]=0;colors[i*3+1]=0.9;colors[i*3+2]=1; }
+    else      { colors[i*3]=1;colors[i*3+1]=0.13;colors[i*3+2]=0.27; }
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions,3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors,3));
+  const mat = new THREE.PointsMaterial({ size:0.14, vertexColors:true, transparent:true, opacity:0.7 });
+  const pts = new THREE.Points(geo, mat);
+  scene.add(pts);
+
+  // Wireframe sphere eye
+  const sphereGeo = new THREE.SphereGeometry(7, 24, 16);
+  const sphereMat = new THREE.MeshBasicMaterial({ color:0x00e5ff, wireframe:true, transparent:true, opacity:0.05 });
+  const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+  scene.add(sphere);
+
+  // Inner iris ring
+  const torusGeo = new THREE.TorusGeometry(3.5, 0.04, 8, 80);
+  const torusMat = new THREE.MeshBasicMaterial({ color:0x00e5ff, transparent:true, opacity:0.5 });
+  const torus = new THREE.Mesh(torusGeo, torusMat);
+  scene.add(torus);
+
+  const torus2 = new THREE.Mesh(
+    new THREE.TorusGeometry(5.5, 0.02, 8, 80),
+    new THREE.MeshBasicMaterial({ color:0xff2244, transparent:true, opacity:0.25 })
+  );
+  scene.add(torus2);
+
+  // Mouse parallax
+  let targetX=0, targetY=0, curX=0, curY=0;
+  window.addEventListener('mousemove', e => {
+    targetX = (e.clientX/innerWidth - 0.5) * 0.4;
+    targetY = (e.clientY/innerHeight - 0.5) * 0.4;
+  });
+
+  window.addEventListener('resize',()=>{
+    camera.aspect = innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  let t = 0;
+  function animate(){
+    requestAnimationFrame(animate);
+    t += 0.006;
+    curX += (targetX-curX)*0.04;
+    curY += (targetY-curY)*0.04;
+    pts.rotation.y = t*0.06 + curX;
+    pts.rotation.x = t*0.03 + curY;
+    sphere.rotation.y = -t*0.12;
+    sphere.rotation.x = Math.sin(t*0.3)*0.2;
+    torus.rotation.z  = t*0.4;
+    torus.rotation.x  = Math.PI/2 + Math.sin(t*0.5)*0.1;
+    torus2.rotation.z = -t*0.2;
+    torus2.rotation.y = t*0.1;
+    mat.opacity = 0.5 + Math.sin(t)*0.2;
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+
+/* â”€â”€â”€ COUNTER ANIMATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+function animateCounter(el){
+  const target = parseFloat(el.dataset.target);
+  const isDecimal = target%1 !== 0;
+  let start = null;
+  const duration = 2000;
+  function step(ts){
+    if(!start) start=ts;
+    const progress = Math.min((ts-start)/duration, 1);
+    const ease = 1-Math.pow(1-progress,3);
+    const val = target*ease;
+    el.textContent = isDecimal ? val.toFixed(1) : Math.floor(val);
+    if(progress<1) requestAnimationFrame(step);
+    else el.textContent = isDecimal ? target.toFixed(1) : target;
+  }
+  requestAnimationFrame(step);
+}
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting){ animateCounter(e.target); observer.unobserve(e.target); } });
+},{ threshold:0.5 });
+document.querySelectorAll('.stat-num[data-target]').forEach(el=>observer.observe(el));
+
+/* â”€â”€â”€ SCROLL REVEAL â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+const revealObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.style.opacity='1';
+      e.target.style.transform='none';
+    }
+  });
+},{ threshold:0.1 });
+document.querySelectorAll('.feature-card,.pipe-step,.info-block,.about-visual').forEach(el=>{
+  el.style.opacity='0';
+  el.style.transform='translateY(30px)';
+  el.style.transition='opacity 0.7s ease, transform 0.7s ease';
+  revealObs.observe(el);
+});
+
+/* â”€â”€â”€ METER ANIMATION â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+const meterObs = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{
+    if(e.isIntersecting){
+      e.target.querySelectorAll('.meter-fill').forEach(m=>{
+        const w = m.style.width;
+        m.style.width='0'; 
+        setTimeout(()=>m.style.width=w,200);
+      });
+      meterObs.unobserve(e.target);
+    }
+  });
+},{ threshold:0.3 });
+document.querySelectorAll('.panel-info').forEach(el=>meterObs.observe(el));
+</script>
+<script>
+(() => {
+  const uploadZone = document.querySelector('.upload-zone');
+  const mediaInput = document.getElementById('mediaInput');
+  const browseBtn = document.getElementById('browseBtn');
+  const analyzeFileBtn = document.getElementById('analyzeFileBtn');
+  const analyzeTextBtn = document.getElementById('analyzeTextBtn');
+  const textInput = document.getElementById('newsTextInput');
+  const statusEl = document.getElementById('analysisStatus');
+  const resultEl = document.getElementById('analysisResult');
+  const terminalBody = document.querySelector('.terminal-body');
+  const authCta = document.getElementById('authCta');
+  const navLoginLink = document.getElementById('navLoginLink');
+  const navSignupLink = document.getElementById('navSignupLink');
+  const LOCAL_API_ORIGIN = 'http://127.0.0.1:8000';
+  const servedFromApiOrigin =
+    (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') &&
+    window.location.port === '8000';
+  const apiBase = servedFromApiOrigin ? '' : LOCAL_API_ORIGIN;
+
+  if (!uploadZone || !mediaInput || !browseBtn || !analyzeFileBtn || !analyzeTextBtn || !textInput || !statusEl || !resultEl) {
+    return;
+  }
+
+  let selectedFile = null;
+  let analysisRuns = 0;
+  let busyMode = null;
+  let currentUser = null;
+  let requireAuth = false;
+  const fileBtnLabel = analyzeFileBtn.textContent;
+  const textBtnLabel = analyzeTextBtn.textContent;
+  const dashboardPath = servedFromApiOrigin ? '/' : '/syntHeye.html';
+
+  function apiUrl(path) {
+    return `${apiBase}${path}`;
+  }
+
+  function authPagePath(page, includeNext = false) {
+    const base = servedFromApiOrigin ? `/${page}` : `/${page}.html`;
+    if (!includeNext) return base;
+    const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}` || dashboardPath;
+    return `${base}?next=${encodeURIComponent(currentPath)}`;
+  }
+
+  function updateAuthLinks() {
+    if (navLoginLink) {
+      navLoginLink.href = authPagePath('login', true);
+      navLoginLink.style.display = currentUser ? 'none' : '';
+    }
+    if (navSignupLink) {
+      navSignupLink.href = authPagePath('signup', true);
+      navSignupLink.style.display = currentUser ? 'none' : '';
+    }
+  }
+
+  async function fetchApi(path, options = {}) {
+    return fetch(apiUrl(path), {
+      credentials: 'include',
+      ...options
+    });
+  }
+
+  function setBusy(nextMode) {
+    busyMode = nextMode;
+    const isBusy = Boolean(nextMode);
+    browseBtn.disabled = isBusy;
+    mediaInput.disabled = isBusy;
+    analyzeFileBtn.disabled = isBusy;
+    analyzeTextBtn.disabled = isBusy;
+    if (authCta && currentUser) {
+      authCta.disabled = isBusy;
+    }
+    analyzeFileBtn.textContent = nextMode === 'file' ? 'Analyzing...' : fileBtnLabel;
+    analyzeTextBtn.textContent = nextMode === 'text' ? 'Analyzing...' : textBtnLabel;
+  }
+
+  function setStatus(message, isError = false) {
+    statusEl.textContent = message;
+    statusEl.style.color = isError ? 'var(--red)' : 'var(--muted)';
+  }
+
+  function renderResult(data) {
+    resultEl.textContent = JSON.stringify(data, null, 2);
+  }
+
+  function pushTerminal(text, type = 'comment') {
+    if (!terminalBody) return;
+    const line = document.createElement('div');
+    line.className = 'term-line';
+    const span = document.createElement('span');
+    span.className = type;
+    span.textContent = text;
+    line.appendChild(span);
+    terminalBody.appendChild(line);
+    terminalBody.scrollTop = terminalBody.scrollHeight;
+  }
+
+  function toPercent(value) {
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      return null;
+    }
+    return Math.max(0, Math.min(100, numeric * 100));
+  }
+
+  function setMeter(nameId, valueId, fillId, label, percentOrNull) {
+    const nameEl = document.getElementById(nameId);
+    const valueEl = document.getElementById(valueId);
+    const fillEl = document.getElementById(fillId);
+    if (nameEl) nameEl.textContent = label;
+    if (percentOrNull === null) {
+      if (valueEl) valueEl.textContent = '--';
+      if (fillEl) fillEl.style.width = '0%';
+      return;
+    }
+    if (valueEl) valueEl.textContent = `${percentOrNull.toFixed(1)}%`;
+    if (fillEl) fillEl.style.width = `${percentOrNull.toFixed(1)}%`;
+  }
+
+  function setCounterValue(counterId, value, decimals = 0) {
+    const el = document.getElementById(counterId);
+    if (!el) return;
+    const numeric = Number(value);
+    if (!Number.isFinite(numeric)) {
+      el.textContent = '0';
+      return;
+    }
+
+    const target = decimals > 0 ? Number(numeric.toFixed(decimals)) : Math.round(numeric);
+    el.dataset.target = String(target);
+    el.textContent = '0';
+    if (typeof animateCounter === 'function') {
+      animateCounter(el);
+    } else {
+      el.textContent = String(target);
+    }
+  }
+
+  async function parseApiResponse(response) {
+    const bodyText = await response.text();
+    let payload = {};
+    if (bodyText) {
+      try {
+        payload = JSON.parse(bodyText);
+      } catch (err) {
+        payload = { detail: bodyText.slice(0, 250) };
+      }
+    }
+    if (!response.ok) {
+      throw new Error(payload.detail || `Request failed (${response.status})`);
+    }
+    return payload;
+  }
+
+  function normalizeError(error) {
+    const message = error?.message || 'Request failed.';
+    if (message.toLowerCase().includes('failed to fetch')) {
+      return `Cannot reach API at ${apiBase || window.location.origin}. Start backend with: uvicorn api_server:app --reload --host 127.0.0.1 --port 8000`;
+    }
+    return message;
+  }
+
+  function shouldRedirectToLogin(message) {
+    return String(message || '').toLowerCase().includes('authentication required');
+  }
+
+  function updateAuthUi(user) {
+    currentUser = user || null;
+    updateAuthLinks();
+
+    if (!authCta) {
+      return;
+    }
+
+    authCta.onclick = null;
+    if (currentUser) {
+      authCta.textContent = `Logout (${currentUser.email})`;
+      authCta.title = `Signed in as ${currentUser.email}`;
+      authCta.onclick = async () => {
+        try {
+          await parseApiResponse(
+            await fetchApi('/api/auth/logout', { method: 'POST' })
+          );
+          updateAuthUi(null);
+          if (requireAuth) {
+            setStatus('You have been logged out. Redirecting to login...');
+            window.location.href = authPagePath('login', true);
+          } else {
+            setStatus('Logged out.');
+          }
+        } catch (error) {
+          const message = normalizeError(error);
+          setStatus(message, true);
+          pushTerminal(`Logout error: ${message}`, 'danger');
+        }
+      };
+      return;
+    }
+
+    authCta.textContent = 'Login / Signup';
+    authCta.title = 'Open login page';
+    authCta.onclick = () => {
+      window.location.href = authPagePath('login', true);
+    };
+  }
+
+  function setAnalysisAvailability(enabled) {
+    const disabled = !enabled;
+    browseBtn.disabled = disabled;
+    mediaInput.disabled = disabled;
+    analyzeFileBtn.disabled = disabled;
+    analyzeTextBtn.disabled = disabled;
+  }
+
+  async function loadCurrentUser() {
+    try {
+      const payload = await parseApiResponse(await fetchApi('/api/me'));
+      requireAuth = Boolean(payload?.require_auth);
+      updateAuthUi(payload?.user || null);
+
+      const authenticated = Boolean(payload?.authenticated);
+      if (requireAuth && !authenticated) {
+        analysisRuns = 0;
+        setCounterValue('statRuns', analysisRuns, 0);
+        setAnalysisAvailability(false);
+        setStatus('Sign in required for media analysis.', true);
+        pushTerminal('Authentication required. Redirecting to /login is recommended.', 'warn');
+      } else {
+        setAnalysisAvailability(true);
+      }
+    } catch (error) {
+      const message = normalizeError(error);
+      setStatus(message, true);
+      pushTerminal(`Auth check failed: ${message}`, 'danger');
+      setAnalysisAvailability(false);
+    }
+  }
+
+  async function loadHistoryStats() {
+    if (requireAuth && !currentUser) {
+      return;
+    }
+    try {
+      const response = await fetchApi('/api/history?limit=1');
+      const payload = await parseApiResponse(response);
+      const total = Number(payload?.total_count ?? payload?.count ?? 0);
+      if (Number.isFinite(total) && total >= 0) {
+        analysisRuns = Math.round(total);
+        setCounterValue('statRuns', analysisRuns, 0);
+      }
+    } catch (error) {
+      const message = normalizeError(error);
+      pushTerminal(`History stats unavailable: ${message}`, 'warn');
+    }
+  }
+
+  function applyModelStats(stats) {
+    const deepfakeAcc = toPercent(stats?.deepfake?.validation_accuracy);
+    const deepfakeAuc = toPercent(stats?.deepfake?.validation_auc);
+    const misinfoAcc = toPercent(stats?.misinfo?.validation_accuracy);
+    const misinfoF1 = toPercent(stats?.misinfo?.validation_f1_fake);
+    const samplesTotal = Number(stats?.misinfo?.samples_total) || 0;
+
+    setCounterValue('statDeepfakeAcc', deepfakeAcc || 0, 1);
+    setCounterValue('statMisinfoAcc', misinfoAcc || 0, 1);
+    setCounterValue('statSamples', samplesTotal, 0);
+    setCounterValue('statRuns', analysisRuns, 0);
+
+    setMeter('meterVisualName', 'meterVisualValue', 'meterVisualFill', 'Validation Accuracy', deepfakeAcc);
+    setMeter('meterVideoName', 'meterVideoValue', 'meterVideoFill', 'Validation AUC', deepfakeAuc);
+    setMeter('meterMisinfoAccName', 'meterMisinfoAccValue', 'meterMisinfoAccFill', 'Validation Accuracy', misinfoAcc);
+    setMeter('meterMisinfoF1Name', 'meterMisinfoF1Value', 'meterMisinfoF1Fill', 'Validation F1 (fake)', misinfoF1);
+  }
+
+  function applyLiveResultMetrics(payload) {
+    analysisRuns += 1;
+    setCounterValue('statRuns', analysisRuns, 0);
+
+    const confidencePct = toPercent(payload?.confidence);
+    if (payload?.task === 'deepfake_image') {
+      setMeter('meterVisualName', 'meterVisualValue', 'meterVisualFill', 'Last Image Confidence', confidencePct);
+      return;
+    }
+    if (payload?.task === 'deepfake_video') {
+      setMeter('meterVideoName', 'meterVideoValue', 'meterVideoFill', 'Last Video Confidence', confidencePct);
+      return;
+    }
+    if (payload?.task === 'misinfo_text') {
+      const fakeProbabilityPct = toPercent(payload?.fake_probability);
+      setMeter('meterMisinfoAccName', 'meterMisinfoAccValue', 'meterMisinfoAccFill', 'Last Text Confidence', confidencePct);
+      setMeter('meterMisinfoF1Name', 'meterMisinfoF1Value', 'meterMisinfoF1Fill', 'Fake Probability', fakeProbabilityPct);
+    }
+  }
+
+  async function loadModelStats() {
+    setStatus('Checking API and loading model stats...');
+    try {
+      const response = await fetchApi('/api/model/stats');
+      const payload = await parseApiResponse(response);
+      applyModelStats(payload);
+      const active = Number(payload?.active_models) || 0;
+      if (requireAuth && !currentUser) {
+        setStatus('API ready. Sign in required for media analysis.', true);
+      } else {
+        setStatus(`API ready. Active models: ${active}.`);
+      }
+      pushTerminal(`API ready (${apiBase || window.location.origin})`, 'ok');
+      warmupDeepfakeModel();
+    } catch (error) {
+      const message = normalizeError(error);
+      setStatus(message, true);
+      pushTerminal(`API error: ${message}`, 'danger');
+    }
+  }
+
+  async function warmupDeepfakeModel() {
+    try {
+      const response = await fetchApi('/api/warmup/deepfake', {
+        method: 'POST'
+      });
+      const payload = await parseApiResponse(response);
+      pushTerminal(`Deepfake model warmed in ${payload.load_seconds}s`, 'comment');
+    } catch (error) {
+      const message = normalizeError(error);
+      pushTerminal(`Warmup skipped: ${message}`, 'warn');
+    }
+  }
+
+  async function analyzeFile() {
+    if (busyMode) {
+      setStatus(`Please wait. ${busyMode} analysis is already running.`);
+      return;
+    }
+    if (requireAuth && !currentUser) {
+      setStatus('Please sign in before running analysis.', true);
+      window.location.href = authPagePath('login', true);
+      return;
+    }
+    if (!selectedFile) {
+      setStatus('Select a file first.', true);
+      return;
+    }
+
+    setStatus(`Analyzing file: ${selectedFile.name} ...`);
+    pushTerminal(`Analyzing upload: ${selectedFile.name}`, 'comment');
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    setBusy('file');
+
+    try {
+      const response = await fetchApi('/api/analyze/file', {
+        method: 'POST',
+        body: formData
+      });
+      const payload = await parseApiResponse(response);
+      renderResult(payload);
+      applyLiveResultMetrics(payload);
+      setStatus(`Done: ${payload.task} -> ${payload.prediction?.toUpperCase() || 'OK'}`);
+      pushTerminal(`Verdict: ${payload.prediction?.toUpperCase() || 'OK'} (confidence ${Math.round((payload.confidence || 0) * 100)}%)`, 'ok');
+    } catch (error) {
+      const message = normalizeError(error);
+      setStatus(message, true);
+      pushTerminal(`Error: ${message}`, 'danger');
+      if (shouldRedirectToLogin(message)) {
+        window.location.href = authPagePath('login', true);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function analyzeText() {
+    if (busyMode) {
+      setStatus(`Please wait. ${busyMode} analysis is already running.`);
+      return;
+    }
+    if (requireAuth && !currentUser) {
+      setStatus('Please sign in before running analysis.', true);
+      window.location.href = authPagePath('login', true);
+      return;
+    }
+    const text = textInput.value.trim();
+    if (!text) {
+      setStatus('Paste text before running text analysis.', true);
+      return;
+    }
+
+    setStatus('Analyzing text...');
+    pushTerminal('Analyzing text payload...', 'comment');
+    setBusy('text');
+    try {
+      const response = await fetchApi('/api/analyze/text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text })
+      });
+      const payload = await parseApiResponse(response);
+      renderResult(payload);
+      applyLiveResultMetrics(payload);
+      setStatus(`Done: ${payload.task} -> ${payload.prediction?.toUpperCase() || 'OK'}`);
+      pushTerminal(`Text verdict: ${payload.prediction?.toUpperCase()} (confidence ${Math.round((payload.confidence || 0) * 100)}%)`, 'ok');
+    } catch (error) {
+      const message = normalizeError(error);
+      setStatus(message, true);
+      pushTerminal(`Error: ${message}`, 'danger');
+      if (shouldRedirectToLogin(message)) {
+        window.location.href = authPagePath('login', true);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  browseBtn.addEventListener('click', () => mediaInput.click());
+  analyzeFileBtn.addEventListener('click', analyzeFile);
+  analyzeTextBtn.addEventListener('click', analyzeText);
+
+  mediaInput.addEventListener('change', () => {
+    selectedFile = mediaInput.files?.[0] || null;
+    if (selectedFile) {
+      setStatus(`Selected: ${selectedFile.name}`);
+    }
+  });
+
+  uploadZone.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    uploadZone.style.borderColor = 'rgba(0,229,255,0.6)';
+  });
+
+  uploadZone.addEventListener('dragleave', () => {
+    uploadZone.style.borderColor = 'rgba(0,229,255,0.2)';
+  });
+
+  uploadZone.addEventListener('drop', (event) => {
+    event.preventDefault();
+    uploadZone.style.borderColor = 'rgba(0,229,255,0.2)';
+    const file = event.dataTransfer?.files?.[0] || null;
+    if (!file) return;
+    selectedFile = file;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    mediaInput.files = dt.files;
+    setStatus(`Dropped: ${file.name}`);
+  });
+
+  updateAuthLinks();
+
+  (async () => {
+    await loadCurrentUser();
+    await loadHistoryStats();
+    await loadModelStats();
+  })();
+})();
+</script>
+</body>
+</html>
