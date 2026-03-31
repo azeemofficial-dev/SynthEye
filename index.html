@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SynthEye | Reality Integrity Console</title>
+  <meta name="description" content="SynthEye is a dark, interactive intelligence console for deepfake and misinformation detection workflows.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <canvas id="bg-canvas" aria-hidden="true"></canvas>
+  <div id="noise-overlay" aria-hidden="true"></div>
+
+  <header class="topbar">
+    <a id="brandLink" href="/syntHeye.html" class="brand">
+      <span class="brand-mark"></span>
+      <span class="brand-text">SynthEye</span>
+    </a>
+    <nav class="nav-links">
+      <a href="#modules">Modules</a>
+      <a href="#pipeline">Pipeline</a>
+      <a id="dashboardLink" href="/syntHeye.html">Dashboard</a>
+      <a id="signupNavLink" href="/signup.html">Sign Up</a>
+      <a id="loginNavLink" href="/login.html">Login</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero reveal">
+      <p class="eyebrow">Cognitive Security Interface</p>
+      <h1>Hunt Synthetic Signals in the Dark.</h1>
+      <p class="hero-copy">
+        SynthEye unifies deepfake forensics and misinformation intelligence in a single immersive control surface.
+        This landing console is now API-connected with live auth and analysis calls.
+      </p>
+      <p id="backendStatus" class="hero-copy">Checking backend session...</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" id="startScanning">Open Detection Modules</button>
+        <button class="btn btn-ghost" id="watchScene">Focus 3D Core</button>
+        <button class="btn btn-ghost" id="authActionBtn" type="button">Checking Session...</button>
+      </div>
+      <div class="hero-metrics">
+        <article>
+          <span class="metric-label">Deepfake Vision</span>
+          <strong class="metric-value">Image + Video</strong>
+        </article>
+        <article>
+          <span class="metric-label">Narrative Shield</span>
+          <strong class="metric-value">News + Social Text</strong>
+        </article>
+        <article>
+          <span class="metric-label">Current Mode</span>
+          <strong class="metric-value" id="currentModeMetric">Connected</strong>
+        </article>
+      </div>
+    </section>
+
+    <section id="modules" class="modules">
+      <article class="module-card reveal">
+        <header>
+          <p class="card-kicker">Module 01</p>
+          <h2>Deepfake Image & Video Detection</h2>
+          <p>Upload a target file and simulate forensic analysis. Real model endpoints can be connected later.</p>
+        </header>
+        <form id="deepfakeForm" class="analysis-form">
+          <label>
+            Asset Type
+            <select id="assetType">
+              <option value="image">Image</option>
+              <option value="video">Video</option>
+            </select>
+          </label>
+          <label>
+            Upload Asset
+            <input id="assetFile" type="file" accept="image/*,video/*">
+          </label>
+          <label>
+            Optional Notes
+            <textarea id="assetNotes" rows="3" placeholder="Case id, source, or context"></textarea>
+          </label>
+          <button class="btn btn-primary" id="deepfakeSubmitBtn" type="submit">Run Forensic Scan</button>
+        </form>
+        <div class="status-box" id="deepfakeStatus">Awaiting input...</div>
+        <div class="result-grid">
+          <div class="result-item">
+            <span>Manipulation Probability</span>
+            <strong id="manipulationProbability">--%</strong>
+          </div>
+          <div class="result-item">
+            <span>Frame/Pixel Anomaly</span>
+            <strong id="anomalyScore">--</strong>
+          </div>
+          <div class="result-item">
+            <span>Verdict</span>
+            <strong id="deepfakeVerdict">Pending</strong>
+          </div>
+        </div>
+      </article>
+
+      <article class="module-card reveal">
+        <header>
+          <p class="card-kicker">Module 02</p>
+          <h2>Fake News & Misinformation Prediction</h2>
+          <p>Paste text or article URL to simulate claim-level credibility scoring and narrative risk signals.</p>
+        </header>
+        <form id="newsForm" class="analysis-form">
+          <label>
+            Source URL (optional)
+            <input id="sourceUrl" type="url" placeholder="https://example.com/article">
+          </label>
+          <label>
+            Headline or Content
+            <textarea id="newsText" rows="5" placeholder="Paste article text, post content, or headline"></textarea>
+          </label>
+          <button class="btn btn-primary" id="newsSubmitBtn" type="submit">Run Intelligence Scan</button>
+        </form>
+        <div class="status-box" id="newsStatus">Awaiting input...</div>
+        <div class="result-grid">
+          <div class="result-item">
+            <span>Misinformation Risk</span>
+            <strong id="misinfoRisk">--%</strong>
+          </div>
+          <div class="result-item">
+            <span>Claim Volatility</span>
+            <strong id="volatilityScore">--</strong>
+          </div>
+          <div class="result-item">
+            <span>Trust Verdict</span>
+            <strong id="newsVerdict">Pending</strong>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <section id="pipeline" class="pipeline reveal">
+      <h2>System Pipeline Blueprint</h2>
+      <div class="pipeline-grid">
+        <article>
+          <h3>1. Intake</h3>
+          <p>Secure file/text ingestion with metadata capture and pre-processing queues.</p>
+        </article>
+        <article>
+          <h3>2. Detection</h3>
+          <p>Deepfake and misinformation models run independently, then feed joint confidence logic.</p>
+        </article>
+        <article>
+          <h3>3. Explainability</h3>
+          <p>Surface saliency maps, claim traces, and confidence drift for analyst verification.</p>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer id="contact">
+    <p>SynthEye Prototype Interface • <span id="year"></span></p>
+  </footer>
+
+  <script src="https://unpkg.com/three@0.162.0/build/three.min.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

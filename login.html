@@ -1,0 +1,231 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SynthEye - Login</title>
+<style>
+  :root {
+    --bg: #050a12;
+    --panel: #0b1320;
+    --cyan: #00d7ff;
+    --red: #ff4666;
+    --text: #d7e7ef;
+    --muted: #6f8898;
+    --border: rgba(0, 215, 255, 0.2);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: radial-gradient(circle at 90% 10%, #0d2237 0%, var(--bg) 45%, #02050a 100%);
+    color: var(--text);
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+  }
+  .card {
+    width: 100%;
+    max-width: 430px;
+    background: linear-gradient(180deg, rgba(9, 19, 33, 0.94), rgba(5, 10, 18, 0.96));
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 24px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.45);
+  }
+  .brand {
+    font-size: 24px;
+    letter-spacing: 0.08em;
+    margin: 0 0 8px;
+  }
+  .brand span { color: var(--cyan); }
+  .subtitle {
+    margin: 0 0 20px;
+    color: var(--muted);
+    font-size: 14px;
+  }
+  label {
+    display: block;
+    margin: 14px 0 6px;
+    font-size: 13px;
+    color: #9eb4c2;
+  }
+  input {
+    width: 100%;
+    padding: 11px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(0, 215, 255, 0.18);
+    background: rgba(0, 0, 0, 0.3);
+    color: var(--text);
+    outline: none;
+  }
+  input:focus {
+    border-color: rgba(0, 215, 255, 0.5);
+    box-shadow: 0 0 0 3px rgba(0, 215, 255, 0.12);
+  }
+  button {
+    margin-top: 18px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 10px;
+    background: linear-gradient(90deg, #00b9db, #00f0ff);
+    color: #00131d;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+  }
+  button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+  .status {
+    min-height: 24px;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .status.error { color: var(--red); }
+  .status.ok { color: #3be28c; }
+  .foot {
+    margin-top: 16px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  .foot-row {
+    margin-top: 8px;
+  }
+  .foot a {
+    color: var(--cyan);
+    text-decoration: none;
+  }
+</style>
+</head>
+<body>
+  <main class="card">
+    <h1 class="brand"><span>SYNTH</span>EYE</h1>
+    <p class="subtitle">Sign in to access your dashboard and analysis tools.</p>
+
+    <form id="loginForm">
+      <label for="email">Email</label>
+      <input id="email" name="email" type="email" autocomplete="email" required />
+
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+
+      <button id="submitBtn" type="submit">Sign In</button>
+      <div id="status" class="status"></div>
+    </form>
+
+    <p class="foot">New here? <a id="signupLink" href="/signup.html">Create an account</a></p>
+    <p class="foot foot-row">Back to dashboard: <a id="dashboardLink" href="/syntHeye.html">Open SynthEye</a></p>
+  </main>
+
+<script>
+(() => {
+  const form = document.getElementById('loginForm');
+  const submitBtn = document.getElementById('submitBtn');
+  const statusEl = document.getElementById('status');
+  const signupLink = document.getElementById('signupLink');
+  const dashboardLink = document.getElementById('dashboardLink');
+  const LOCAL_API_ORIGIN = 'http://127.0.0.1:8000';
+  const servedFromApiOrigin =
+    (window.location.hostname === '127.0.0.1' || window.location.hostname === 'localhost') &&
+    window.location.port === '8000';
+  const apiBase = servedFromApiOrigin ? '' : LOCAL_API_ORIGIN;
+
+  function appPath(path8000, path5500) {
+    return servedFromApiOrigin ? path8000 : path5500;
+  }
+
+  const dashboardPath = appPath('/', '/syntHeye.html');
+  const signupPath = appPath('/signup', '/signup.html');
+
+  function resolveNext(defaultPath) {
+    const raw = new URLSearchParams(window.location.search).get('next') || '';
+    if (raw.startsWith('/') && !raw.startsWith('//')) {
+      return raw;
+    }
+    return defaultPath;
+  }
+
+  const nextPath = resolveNext(dashboardPath);
+
+  if (signupLink) {
+    signupLink.setAttribute('href', `${signupPath}?next=${encodeURIComponent(nextPath)}`);
+  }
+  if (dashboardLink) {
+    dashboardLink.setAttribute('href', dashboardPath);
+  }
+
+  function setStatus(message, type = '') {
+    statusEl.textContent = message;
+    statusEl.className = `status ${type}`.trim();
+  }
+
+  async function parseResponse(response) {
+    const text = await response.text();
+    let payload = {};
+    if (text) {
+      try {
+        payload = JSON.parse(text);
+      } catch (error) {
+        payload = { detail: text };
+      }
+    }
+    if (!response.ok) {
+      throw new Error(payload.detail || `Request failed (${response.status})`);
+    }
+    return payload;
+  }
+
+  async function fetchApi(path, options = {}) {
+    return fetch(`${apiBase}${path}`, {
+      credentials: 'include',
+      ...options
+    });
+  }
+
+  async function loadSession() {
+    try {
+      const payload = await parseResponse(await fetchApi('/api/me'));
+      if (payload?.authenticated) {
+        setStatus('Session found. Redirecting...', 'ok');
+        window.location.href = nextPath;
+      }
+    } catch (_error) {
+      // Ignore session preload errors and allow manual login flow.
+    }
+  }
+
+  loadSession();
+
+  form.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const email = String(document.getElementById('email').value || '').trim();
+    const password = String(document.getElementById('password').value || '');
+
+    submitBtn.disabled = true;
+    setStatus('Signing in...');
+    try {
+      await parseResponse(
+        await fetchApi('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        })
+      );
+      setStatus('Login successful. Redirecting...', 'ok');
+      window.location.href = nextPath;
+    } catch (error) {
+      setStatus(error.message || 'Login failed.', 'error');
+    } finally {
+      submitBtn.disabled = false;
+    }
+  });
+})();
+</script>
+</body>
+</html>
