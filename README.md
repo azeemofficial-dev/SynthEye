@@ -2,7 +2,7 @@
 
 This project provides two CPU-friendly detection pipelines:
 
-# AI 2 - SynthEye Team Distribution
+#SynthEye Team Distribution
 
 This repository package contains a complete copy of the SynthEye project and a role-based split for team submissions on GitHub.
 
