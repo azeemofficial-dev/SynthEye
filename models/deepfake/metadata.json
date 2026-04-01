@@ -1,0 +1,14 @@
+{
+  "model_path": "models\\deepfake\\deepfake_detector.keras",
+  "img_size": 128,
+  "class_names": {
+    "0": "fake",
+    "1": "real"
+  },
+  "threshold": 0.5,
+  "validation_metrics": {
+    "loss": 0.46593552827835083,
+    "accuracy": 0.7828711271286011,
+    "auc": 0.8542028069496155
+  }
+}
