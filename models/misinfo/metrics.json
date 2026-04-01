@@ -1,0 +1,16 @@
+{
+  "samples_total": 38639,
+  "samples_train": 30911,
+  "samples_validation": 7728,
+  "label_distribution": {
+    "real": 21190,
+    "fake": 17449
+  },
+  "validation_accuracy": 0.9847308488612836,
+  "validation_f1_fake": 0.982982405537929,
+  "numeric_labels": "0_fake_1_real",
+  "classes": [
+    "fake",
+    "real"
+  ]
+}
