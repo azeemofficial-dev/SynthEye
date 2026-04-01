@@ -2,7 +2,7 @@
 
 This project provides two CPU-friendly detection pipelines:
 
-#SynthEye Team Distribution
+##SynthEye Team Distribution
 
 This repository package contains a complete copy of the SynthEye project and a role-based split for team submissions on GitHub.
 
@@ -79,12 +79,6 @@ Note: a dedicated `news.csv` dataset file was not present in the project snapsho
 - `predict.py`
 - `prepare_data.py`
 - `check_backend.ps1`
-
-## GitHub Upload Guidance
-
-1. Upload each member folder from `team_split/` as that member's contribution.
-2. Keep the file ownership mapping above in each member repository README or description.
-3. If needed, keep `full_project_copy/` as a reference archive in a separate repository.
 
 ## Security Notes
 
